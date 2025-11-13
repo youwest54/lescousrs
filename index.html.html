@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Translation HTML Exporter</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .row { border: 1px solid #ddd; padding: 10px; margin-top: 10px; }
+    .row label { display: block; margin-top: 5px; font-weight: bold; }
+    .row textarea { width: 100%; height: 60px; margin-top: 3px; }
+    button, input[type="file"] { padding: 8px 12px; margin: 10px 5px 0 0; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Translation HTML Exporter</h1>
+
+  <!-- File uploader to import a previously exported table -->
+  <input type="file" id="uploadInput" accept=".html,.htm">
+
+  <div id="inputRows"></div>
+
+  <button id="addRowBtn">+ Add Row</button>
+  <button id="exportBtn">Export HTML File</button>
+
+  <script>
+    // initial starter row
+    createRow('كنت باغي نشريه، ولكن ما كانش فالمخزون، فين ما مشيت ما لقيتوش.',
+              'I tried to get it, but it was sold out no matter where I went.',
+              'J\u2019ai voulu l\u2019acheter, mais il \u00e9tait en rupture de stock, peu importe o\u00f9 j\u2019allais.');
+
+    document.getElementById('addRowBtn').addEventListener('click', () => createRow());
+    document.getElementById('exportBtn').addEventListener('click', exportHTML);
+    document.getElementById('uploadInput').addEventListener('change', handleUpload);
+
+    // create a new editable input row (optionally with preset values)
+    function createRow(arabic = '', english = '', french = '') {
+      const row = document.createElement('div');
+      row.className = 'row';
+      row.innerHTML = `
+        <label>Arabic</label>
+        <textarea class="arabic-input">${arabic}</textarea>
+        <label>English</label>
+        <textarea class="english-input">${english}</textarea>
+        <label>French</label>
+        <textarea class="french-input">${french}</textarea>
+      `;
+      document.getElementById('inputRows').appendChild(row);
+      row.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Handle HTML upload and populate rows
+    function handleUpload(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = evt => {
+        // clear existing rows
+        document.getElementById('inputRows').innerHTML = '';
+        const htmlText = evt.target.result;
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, 'text/html');
+        const rows = doc.querySelectorAll('#translationsTable tbody tr');
+        if (!rows.length) {
+          alert('No valid translation rows found in the uploaded file.');
+          return;
+        }
+        rows.forEach(tr => {
+          const cells = tr.querySelectorAll('td');
+          const arabic  = cells[0] ? cells[0].textContent.trim() : '';
+          const english = cells[1] ? cells[1].textContent.trim() : '';
+          const french  = cells[2] ? cells[2].textContent.trim() : '';
+          createRow(arabic, english, french);
+        });
+      };
+      reader.readAsText(file, 'utf-8');
+      // reset input so same file can be reselected if needed
+      e.target.value = '';
+    }
+
+    // Export filled rows into a new editable table HTML
+    function exportHTML() {
+      const rows = document.querySelectorAll('#inputRows .row');
+      let tableRows = '';
+      rows.forEach(r => {
+        const arabic  = r.querySelector('.arabic-input').value.trim();
+        const english = r.querySelector('.english-input').value.trim();
+        const french  = r.querySelector('.french-input').value.trim();
+        if (arabic || english || french) {
+          tableRows += `<tr><td class="arabic" contenteditable="true">${arabic}</td><td contenteditable="true">${english}</td><td contenteditable="true">${french}</td></tr>`;
+        }
+      });
+
+      const htmlContent = `<!DOCTYPE html>
+<html lang=\"en\">
+<head>
+  <meta charset=\"UTF-8\" />
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"/>
+  <title>Editable Translations Table</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+    th, td { border: 1px solid #ddd; padding: 8px; }
+    th { background-color: #f4f4f4; text-align: center; }
+    tr:nth-child(even) { background-color: #f9f9f9; }
+    td.arabic { text-align: right; direction: rtl; }
+    td { text-align: center; }
+    button { padding: 10px 15px; margin: 0 5px 10px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Editable Translations Table</h1>
+  <button onclick=\"selectAllText()\">Select All Text</button>
+  <button onclick=\"saveHTML()\">Save HTML</button>
+  <table id=\"translationsTable\">
+    <thead><tr><th>Arabic</th><th>English</th><th>French</th></tr></thead>
+    <tbody>${tableRows}</tbody>
+  </table>
+  <script>
+    function selectAllText() {
+      const tbody = document.querySelector('#translationsTable tbody');
+      const range = document.createRange();
+      range.selectNodeContents(tbody);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    function saveHTML() {
+      const fullHtml = '<!DOCTYPE html>\\n' + document.documentElement.outerHTML;
+      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'editable_translations_table.html';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  <\/script>
+</body>
+</html>`;
+
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'translations_page.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
